@@ -1,0 +1,56 @@
+name: this-repo
+description: |
+  Minimal pure-shell checkout: clones the current GitHub repo to
+  ~/.x-repo/<host>/<owner>/<repo> using the runner's token, sets the
+  default bot identity, and (optionally) applies a repo-scoped
+  .gitconfig via [include].
+
+  This is the x-cmd local cache layout (matches ~/.x-repo/<provider>/<owner>/<repo>).
+  No SSH, no fetch-additional, no filter/sparse — just the minimum
+  needed to land the current repo on disk for downstream steps.
+
+inputs:
+  ref:
+    description: 'Branch, tag, or SHA to check out (default: trigger ref)'
+    required: false
+    default: ${{ github.ref_name }}
+  depth:
+    description: 'Commits to fetch; 0 = full history'
+    required: false
+    default: '1'
+  lfs:
+    description: 'Pull LFS files after checkout'
+    required: false
+    default: 'false'
+  submodules:
+    description: 'Submodule recursion: false | true | recursive'
+    required: false
+    default: 'false'
+  github-server-url:
+    description: 'GitHub server URL (override for Enterprise Server)'
+    required: false
+    default: ${{ github.server_url }}
+  local-config:
+    description: |
+      Path to a .gitconfig file. When set, added as [include] in the
+      cloned repo's .git/config — repo-scoped only, the runner's
+      ~/.gitconfig is left alone. Use for repo-specific signing keys,
+      custom identity, hooks, etc.
+    required: false
+
+runs:
+  using: composite
+  steps:
+    - name: clone current repo into ~/.x-repo (shell)
+      shell: bash
+      env:
+        INPUT_REF: ${{ inputs.ref }}
+        INPUT_DEPTH: ${{ inputs.depth }}
+        INPUT_LFS: ${{ inputs.lfs }}
+        INPUT_SUBMODULES: ${{ inputs.submodules }}
+        INPUT_GITHUB_SERVER_URL: ${{ inputs.github-server-url }}
+        INPUT_LOCAL_CONFIG: ${{ inputs.local-config }}
+        GITHUB_REPOSITORY: ${{ github.repository }}
+        GITHUB_TOKEN: ${{ github.token }}
+        HOME: ${{ github.workspace }}/..  # unused — keep for clarity
+      run: bash ${{ github.action_path }}/lib/this-repo.sh

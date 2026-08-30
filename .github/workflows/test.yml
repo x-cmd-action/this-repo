@@ -1,0 +1,78 @@
+name: test
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout this-repo's own source (for the action.yml + lib + local-config test)
+        uses: actions/checkout@v4
+
+      - name: clone current repo via this-repo (default depth, no options)
+        uses: x-cmd-action/this-repo@v1
+
+      - name: verify clone landed at ~/.x-repo path
+        run: |
+          REPO_DIR="$HOME/.x-repo/github.com/${{ github.repository }}"
+          echo "expected dir: $REPO_DIR"
+          test -d "$REPO_DIR/.git" || { echo "FAIL: $REPO_DIR not a git repo"; exit 1; }
+          echo "OK: $REPO_DIR exists and is a git repo"
+          test -f "$REPO_DIR/action.yml" && echo "OK: action.yml present in cloned repo"
+
+      - name: verify default bot identity applied
+        run: |
+          REPO_DIR="$HOME/.x-repo/github.com/${{ github.repository }}"
+          cd "$REPO_DIR"
+          test "$(git config user.name)" = "github-actions[bot]" && echo "OK: default bot user.name"
+          test "$(git config user.email)" = "github-actions[bot]@users.noreply.github.com" && echo "OK: default bot user.email"
+
+      - name: clone with depth: 0 (full history)
+        uses: x-cmd-action/this-repo@v1
+        with:
+          depth: 0
+
+      - name: verify full-history fetch
+        run: |
+          REPO_DIR="$HOME/.x-repo/github.com/${{ github.repository }}"
+          cd "$REPO_DIR"
+          # Full-history fetch means FETCH_HEAD (or the default branch) has actual history
+          git log --oneline | head -5
+
+      - name: clone with submodules: true
+        uses: x-cmd-action/this-repo@v1
+        with:
+          submodules: true
+
+      - name: clone with local-config (repo-scoped .gitconfig)
+        uses: x-cmd-action/this-repo@v1
+        with:
+          local-config: ${{ github.workspace }}/test.repo.gitconfig
+
+      - name: write a test local-config file
+        run: |
+          cat > test.repo.gitconfig <<'EOF'
+[user]
+    name = thisrepo-specific-bot
+    email = thisrepo-specific@example.com
+EOF
+
+      - name: verify local-config overlay applied (repo-scoped)
+        run: |
+          REPO_DIR="$HOME/.x-repo/github.com/${{ github.repository }}"
+          cd "$REPO_DIR"
+          grep -q "include" .git/config && echo "OK: [include] directive in .git/config"
+          test "$(git config user.name)" = "thisrepo-specific-bot" && echo "OK: local-config user.name wins"
+          test "$(git config user.email)" = "thisrepo-specific@example.com" && echo "OK: local-config user.email wins"
+          # Global ~/.gitconfig must NOT have been touched by this action
+          cd "$HOME" 2>/dev/null || cd /
+          GLOBAL_NAME=$(git config --global user.name 2>/dev/null || echo)
+          test "$GLOBAL_NAME" != "thisrepo-specific-bot" && echo "OK: global ~/.gitconfig untouched"
+
+      - name: verify credential was stripped from remote URL
+        run: |
+          REPO_DIR="$HOME/.x-repo/github.com/${{ github.repository }}"
+          cd "$REPO_DIR"
+          URL=$(git config remote.origin.url)
+          echo "remote URL: $URL"
+          echo "$URL" | grep -qv "x-access-token" && echo "OK: credentials stripped from remote URL"
