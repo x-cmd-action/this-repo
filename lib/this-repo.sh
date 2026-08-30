@@ -1,17 +1,20 @@
 #!/usr/bin/env bash
 # x-cmd-action/this-repo — pure-shell implementation.
 #
-# Minimal "clone current repo" action: lands the trigger repo on disk at
-# ~/.x-repo/<host>/<owner>/<repo> using the runner's token, applies
-# default bot identity, and (optionally) overlays a repo-scoped
-# .gitconfig via [include]. That's it — no SSH, no advanced fetch
-# options, no filter/sparse.
+# Minimal "clone current repo" action. Lands the trigger repo in
+# $GITHUB_WORKSPACE using the runner's token. That's it — no SSH,
+# no filter/sparse, no fetch-additional, no advanced auth. Use
+# x-cmd-action/checkout if you need those.
+#
+# This is intentionally the smallest possible useful checkout: same
+# observable cwd ergonomics as actions/checkout (workspace = repo
+# root, no cd needed in subsequent steps), but with fewer inputs.
 
 set -eu
 
 # ───────────────────── inputs ─────────────────────
 REPOSITORY="${GITHUB_REPOSITORY:-}"
-REF="${INPUT_REF:-}"
+REF="${INPUT_REF:-${GITHUB_REF_NAME:-}}"
 TOKEN="${GITHUB_TOKEN:-}"
 DEPTH="${INPUT_DEPTH:-0}"
 LFS="${INPUT_LFS:-false}"
@@ -25,23 +28,25 @@ HOST=$(echo "$GITHUB_SERVER_URL" | sed -E 's|^https?://||; s|/.*$||')
 # ───────────────────── safe.directory (container safety) ─────────────────────
 git config --global --add safe.directory '*' >/dev/null 2>&1 || true
 
-# ───────────────────── target path: ~/.x-repo/<host>/<owner>/<repo> ─────────────────────
-X_REPO_ROOT="${HOME}/.x-repo"
-TARGET_DIR="${X_REPO_ROOT}/${HOST}/${REPOSITORY}"
+# ───────────────────── target path = $GITHUB_WORKSPACE ─────────────────────
+PATH_DIR="${GITHUB_WORKSPACE:-$(pwd)}"
 
-mkdir -p "$TARGET_DIR"
+mkdir -p "$PATH_DIR"
 
-# Build authenticated URL
 AUTH_URL="https://x-access-token:${TOKEN}@${HOST}/${REPOSITORY}.git"
 
 # ───────────────────── clone or update ─────────────────────
-cd "$TARGET_DIR"
+cd "$PATH_DIR"
 
 if [ -d ".git" ]; then
     echo "this-repo: existing clone detected — updating"
     git remote set-url origin "$AUTH_URL"
-    git fetch --depth="$DEPTH" origin "$REF" 2>/dev/null \
-        || git fetch origin "$REF"
+    if [ "$DEPTH" = "0" ]; then
+        git fetch origin "$REF" 2>/dev/null || git fetch origin "$REF"
+    else
+        git fetch --depth="$DEPTH" origin "$REF" 2>/dev/null \
+            || git fetch --depth="$DEPTH" origin "$REF"
+    fi
 else
     git init -q
     git remote add origin "$AUTH_URL"
@@ -53,24 +58,6 @@ else
 fi
 
 git checkout -f FETCH_HEAD 2>/dev/null || git checkout "$REF"
-
-# ───────────────────── expose repo at $GITHUB_WORKSPACE ─────────────────────
-# Real repo lives at ~/.x-repo/<host>/<owner>/<repo> (x-cmd local cache). To
-# make subsequent steps run in the repo by default (like actions/checkout),
-# surface it at $GITHUB_WORKSPACE:
-#   - if the workspace is an empty directory, replace it with a symlink to
-#     the repo. cwd becomes the repo root.
-#   - if the workspace already has files, leave it alone and create a
-#     `.this-repo` symlink inside it (use
-#     `working-directory: ${{ github.workspace }}/.this-repo`).
-if [ -d "$GITHUB_WORKSPACE" ] && [ -z "$(ls -A "$GITHUB_WORKSPACE" 2>/dev/null)" ]; then
-    rmdir "$GITHUB_WORKSPACE"
-    ln -s "$TARGET_DIR" "$GITHUB_WORKSPACE"
-    echo "this-repo: \$GITHUB_WORKSPACE → $TARGET_DIR (cwd = repo root)"
-else
-    ln -s "$TARGET_DIR" "$GITHUB_WORKSPACE/.this-repo"
-    echo "this-repo: \$GITHUB_WORKSPACE/.this-repo → $TARGET_DIR"
-fi
 
 # ───────────────────── submodules ─────────────────────
 case "$SUBMODULES" in
@@ -111,4 +98,4 @@ if [ -n "$GITCONFIG" ]; then
     echo "this-repo: gitconfig include.path=$INCLUDE_PATH (repo-scoped)"
 fi
 
-echo "this-repo: cloned to $TARGET_DIR"
+echo "this-repo: cloned to $PATH_DIR"

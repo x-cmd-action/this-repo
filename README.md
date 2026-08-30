@@ -1,42 +1,25 @@
 # x-cmd-action/this-repo
 
-> Pure-shell "clone the current repo" — to `~/.x-repo/<host>/<owner>/<repo>`. No Node.js, no SSH, no extra inputs.
+> Pure-shell minimal checkout. Clone the trigger repo into `$GITHUB_WORKSPACE`. No Node.js, no SSH, no extras.
 
 [中文文档](./README.cn.md)
 
 ## What it is
 
-Minimal version of [`x-cmd-action/checkout`](../checkout). Clones the repo that triggered the workflow into the **x-cmd local cache layout** (`~/.x-repo/<host>/<owner>/<repo>`), sets the default bot identity, and stops. That's it.
+The minimum useful checkout. Clones the repo that triggered the workflow into `$GITHUB_WORKSPACE` using the runner's token, sets the default bot identity, and stops.
 
-No SSH, no `repository:` input (always the trigger repo), no `fetch-additional`, no `filter`/`sparse-checkout`, no `path` (path is fixed). For those, use `x-cmd-action/checkout`.
+Same observable ergonomics as `actions/checkout`: subsequent `run:` steps run in the repo by default (cwd = `$GITHUB_WORKSPACE` = repo root). No `cd` needed.
 
-## Why "this-repo"?
+What it **doesn't** have (relative to `x-cmd-action/checkout`):
 
-x-cmd caches repos locally at `~/.x-repo/<provider>/<owner>/<repo>` (see [`x repo`](https://x-cmd.com/#repo) for the cross-agent sharing mechanism). This action lands the trigger repo in exactly that location, so subsequent steps (and other tools on the runner) can find it where x-cmd expects.
+- no SSH (`ssh-key`, `ssh-known-hosts`, `ssh-strict`, `ssh-user`, `known-hosts-url`)
+- no `repository:` input (always the trigger repo)
+- no `path:` (always `$GITHUB_WORKSPACE`)
+- no `fetch-additional`, `filter`, `sparse-checkout`
+- no `clean`, `persist-credentials`, `show-progress`, `set-safe-directory` (defaults are baked in)
+- no `allow-unsafe-pr-checkout`
 
-Layer 1 (basic setup) action: one thing, the smallest possible thing.
-
-## Where the repo lands
-
-**Unlike `x-cmd-action/checkout`, this action does NOT clone into `$GITHUB_WORKSPACE`.** The repo is cloned to `~/.x-repo/github.com/<owner>/<repo>` (the x-cmd local cache). `$GITHUB_WORKSPACE` stays empty.
-
-Consequence: a bare `run:` after this action runs in an empty workspace, **not** in the repo. To run commands against the repo, either:
-
-```yaml
-- uses: x-cmd-action/this-repo@v1
-
-- run: make test
-  working-directory: ${{ github.workspace }}   # workspace is empty — wrong
-
-- run: make test
-  working-directory: ${{ env.REPO_DIR }}      # set via env below
-  env:
-    REPO_DIR: ~/.x-repo/github.com/${{ github.repository }}
-```
-
-Or use x-cmd tools that know the layout (`x repo`, `x gitb backup`, `x eget`, etc.) — they find the repo on their own.
-
-If you want cwd = repo root in subsequent steps, use `x-cmd-action/checkout` (it clones into `$GITHUB_WORKSPACE`). This action is for when you specifically want the x-cmd cache layout.
+Use `x-cmd-action/checkout` if you need any of those.
 
 ## Usage
 
@@ -44,7 +27,17 @@ If you want cwd = repo root in subsequent steps, use `x-cmd-action/checkout` (it
 - uses: x-cmd-action/this-repo@v1
 ```
 
-That's it. The trigger repo lands at `~/.x-repo/github.com/<owner>/<repo>` with `github-actions[bot]` as the local identity.
+That's it. The trigger repo lands in `$GITHUB_WORKSPACE` with `github-actions[bot]` as the local identity. Subsequent steps:
+
+```yaml
+- uses: x-cmd-action/this-repo@v1
+
+- run: ls
+  # shows the repo contents — no cd needed
+
+- run: make test
+  # cwd = repo root
+```
 
 ### With submodules
 
@@ -56,7 +49,7 @@ That's it. The trigger repo lands at `~/.x-repo/github.com/<owner>/<repo>` with 
 
 ### Shallow fetch (only when you need it)
 
-By default `depth` is `0` (full history) — this action is for landing the repo locally so downstream x-cmd tools can see it, so full history is the expected use case. Override to a shallow fetch only if you know that's what you want:
+`depth` defaults to `0` (full history). Override only when you know you want shallow:
 
 ```yaml
 - uses: x-cmd-action/this-repo@v1
@@ -102,7 +95,7 @@ For repo-specific signing keys, custom identity, hooks, etc. — values in this 
 | Input | Default | Description |
 | --- | --- | --- |
 | `ref` | `${{ github.ref_name }}` | branch / tag / SHA |
-| `depth` | `0` | commits to fetch; `0` = full history (default — this-repo is for local caching, full history is the expected case) |
+| `depth` | `0` | commits to fetch; `0` = full history |
 | `lfs` | `false` | pull LFS files after checkout |
 | `submodules` | `false` | `false` / `true` / `recursive` |
 | `github-server-url` | `${{ github.server_url }}` | override for Enterprise |
@@ -110,13 +103,30 @@ For repo-specific signing keys, custom identity, hooks, etc. — values in this 
 
 That's the full list. If you need anything else (SSH, custom path, sparse-checkout, filter, …), use `x-cmd-action/checkout`.
 
+## Comparison with `x-cmd-action/checkout`
+
+| Dimension | `this-repo` | `checkout` |
+| --- | --- | --- |
+| Inputs | 6 | 22 + 3 x-cmd enhancements |
+| Token / HTTPS clone | ✅ | ✅ |
+| SSH auth | ❌ | ✅ |
+| `repository:` / `path:` | trigger repo, fixed path | configurable |
+| Sparse / filter | ❌ | ✅ |
+| `fetch-additional` | ❌ | ✅ |
+| `known-hosts-url` | ❌ | ✅ |
+| `persist-credentials` | baked in | configurable |
+| Default bot identity | ✅ | ✅ |
+| `gitconfig` (repo-scoped) | ✅ | ✅ |
+| cwd = repo root | ✅ | ✅ |
+
+**Use `this-repo` when you don't need any of the `checkout`-only inputs.** Use `checkout` when you do.
+
 ## License
 
 Apache 2.0 — see [`LICENSE`](LICENSE).
 
 ## Related
 
-- [`x-cmd-action/checkout`](https://github.com/x-cmd-action/checkout) — full `actions/checkout` alternative (Layer 2 / common functions). Has SSH, sparse, filter, etc.
+- [`x-cmd-action/checkout`](https://github.com/x-cmd-action/checkout) — full checkout with SSH, sparse, filter, etc. Use when `this-repo` is too thin.
 - [`x-cmd-action/gitconfig`](https://github.com/x-cmd-action/gitconfig) — global `~/.gitconfig` setup. Use when you want config to apply to every git command in the job.
 - [x-cmd-action/.github](https://github.com/x-cmd-action/.github) — org profile + roadmap.
-- [x-cmd `repo`](https://x-cmd.com/#repo) — the local cache layout (`~/.x-repo/...`) this action lands into.

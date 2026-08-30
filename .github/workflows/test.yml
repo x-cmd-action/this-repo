@@ -6,46 +6,30 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - name: checkout this-repo's own source (for the action.yml + lib + local-config test)
+      - name: checkout this-repo's own source (for the action.yml + lib + gitconfig test)
         uses: actions/checkout@v4
 
       - name: clone current repo via this-repo (default depth, no options)
         uses: x-cmd-action/this-repo@v1
 
-      - name: verify clone landed at ~/.x-repo path
+      - name: verify clone landed in \$GITHUB_WORKSPACE
         run: |
-          REPO_DIR="$HOME/.x-repo/github.com/${{ github.repository }}"
-          echo "expected dir: $REPO_DIR"
-          test -d "$REPO_DIR/.git" || { echo "FAIL: $REPO_DIR not a git repo"; exit 1; }
-          echo "OK: $REPO_DIR exists and is a git repo"
-          test -f "$REPO_DIR/action.yml" && echo "OK: action.yml present in cloned repo"
-
-      - name: verify \$GITHUB_WORKSPACE is a symlink to the repo
-        run: |
-          # The first this-repo step runs against an empty workspace, so the
-          # action replaces $GITHUB_WORKSPACE with a symlink → ~/.x-repo/.../repo
-          test -L "$GITHUB_WORKSPACE" || { echo "FAIL: \$GITHUB_WORKSPACE is not a symlink"; exit 1; }
-          TARGET=$(readlink "$GITHUB_WORKSPACE")
-          echo "symlink target: $TARGET"
-          EXPECTED="$HOME/.x-repo/github.com/${{ github.repository }}"
-          test "$TARGET" = "$EXPECTED" && echo "OK: \$GITHUB_WORKSPACE → $EXPECTED"
-          # Verify cwd (which defaults to $GITHUB_WORKSPACE) sees the repo
-          test -f "$GITHUB_WORKSPACE/action.yml" && echo "OK: action.yml visible via cwd (no cd needed)"
+          test -d "$GITHUB_WORKSPACE/.git" || { echo "FAIL: \$GITHUB_WORKSPACE not a git repo"; exit 1; }
+          echo "OK: \$GITHUB_WORKSPACE is a git repo"
+          test -f "$GITHUB_WORKSPACE/action.yml" && echo "OK: action.yml present in cwd"
+          # cwd is the workspace by default
+          pwd
+          test "$(pwd)" = "$GITHUB_WORKSPACE" && echo "OK: cwd = \$GITHUB_WORKSPACE"
 
       - name: verify default bot identity applied
         run: |
-          REPO_DIR="$HOME/.x-repo/github.com/${{ github.repository }}"
-          cd "$REPO_DIR"
+          cd "$GITHUB_WORKSPACE"
           test "$(git config user.name)" = "github-actions[bot]" && echo "OK: default bot user.name"
           test "$(git config user.email)" = "github-actions[bot]@users.noreply.github.com" && echo "OK: default bot user.email"
 
       - name: "verify default depth: 0 (full history) lands"
         run: |
-          # depth defaults to 0, so the default clone should already have full history.
-          # This step just confirms it.
-          REPO_DIR="$HOME/.x-repo/github.com/${{ github.repository }}"
-          cd "$REPO_DIR"
-          # If the repo has any history, default-depth-0 should give it to us.
+          cd "$GITHUB_WORKSPACE"
           git log --oneline | head -5
 
       - name: "clone with depth: 1 (shallow)"
@@ -55,9 +39,7 @@ jobs:
 
       - name: verify shallow fetch took effect
         run: |
-          REPO_DIR="$HOME/.x-repo/github.com/${{ github.repository }}"
-          cd "$REPO_DIR"
-          # .git/shallow exists after a shallow fetch
+          cd "$GITHUB_WORKSPACE"
           test -f .git/shallow && echo "OK: shallow fetch created .git/shallow"
 
       - name: "clone with submodules: true"
@@ -82,8 +64,7 @@ jobs:
 
       - name: verify gitconfig overlay applied (repo-scoped)
         run: |
-          REPO_DIR="$HOME/.x-repo/github.com/${{ github.repository }}"
-          cd "$REPO_DIR"
+          cd "$GITHUB_WORKSPACE"
           grep -q "include" .git/config && echo "OK: [include] directive in .git/config"
           test "$(git config user.name)" = "thisrepo-specific-bot" && echo "OK: gitconfig user.name wins"
           test "$(git config user.email)" = "thisrepo-specific@example.com" && echo "OK: gitconfig user.email wins"
@@ -94,8 +75,7 @@ jobs:
 
       - name: verify credential was stripped from remote URL
         run: |
-          REPO_DIR="$HOME/.x-repo/github.com/${{ github.repository }}"
-          cd "$REPO_DIR"
+          cd "$GITHUB_WORKSPACE"
           URL=$(git config remote.origin.url)
           echo "remote URL: $URL"
           echo "$URL" | grep -qv "x-access-token" && echo "OK: credentials stripped from remote URL"

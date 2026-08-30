@@ -1,42 +1,25 @@
 # x-cmd-action/this-repo
 
-> 纯 shell "checkout 当前 repo" —— 到 `~/.x-repo/<host>/<owner>/<repo>`。无 Node.js、无 SSH、无多余 input。
+> 纯 shell 最精简 checkout。把触发 repo 克隆到 `$GITHUB_WORKSPACE`。无 Node.js、无 SSH、无多余 input。
 
 [English](./README.md)
 
 ## 这是什么
 
-[`x-cmd-action/checkout`](../checkout) 的最小版本。把触发 workflow 的 repo clone 到 **x-cmd 本地缓存布局**（`~/.x-repo/<host>/<owner>/<repo>`），设上默认 bot identity，完事。
+最精简可用的 checkout。把触发 workflow 的 repo 克隆到 `$GITHUB_WORKSPACE`，用 runner 的 token，设上默认 bot identity，完事。
 
-没有 SSH、没有 `repository:` input（永远用触发 repo）、没有 `fetch-additional`、没有 `filter` / `sparse-checkout`、没有 `path`（路径固定）。需要这些，用 `x-cmd-action/checkout`。
+跟 `actions/checkout` 一样的可观察 ergonomics：后续 `run:` step 默认就在 repo 里（cwd = `$GITHUB_WORKSPACE` = repo 根）。不用 `cd`。
 
-## 为何叫 "this-repo"？
+**没有的**（相对 `x-cmd-action/checkout`）：
 
-x-cmd 把 repo 本地缓存在 `~/.x-repo/<provider>/<owner>/<repo>`（见 [`x repo`](https://x-cmd.com/#repo) —— 跨 agent 共享机制）。这个 action 把触发 repo 正好落到那个位置，让后续 step（和 runner 上的其它工具）能在 x-cmd 期望的地方找到它。
+- 没 SSH（`ssh-key`、`ssh-known-hosts`、`ssh-strict`、`ssh-user`、`known-hosts-url`）
+- 没 `repository:` input（永远用触发 repo）
+- 没 `path:`（永远是 `$GITHUB_WORKSPACE`）
+- 没 `fetch-additional`、`filter`、`sparse-checkout`
+- 没 `clean`、`persist-credentials`、`show-progress`、`set-safe-directory`（默认值写死）
+- 没 `allow-unsafe-pr-checkout`
 
-Layer 1（basic setup）action：一件事，最小化的那一件。
-
-## Repo 落在哪
-
-**跟 `x-cmd-action/checkout` 不一样，这个 action 不 clone 到 `$GITHUB_WORKSPACE`。** Repo 落到 `~/.x-repo/github.com/<owner>/<repo>`（x-cmd 本地缓存）。`$GITHUB_WORKSPACE` 保持空。
-
-后果：this-action 之后裸 `run:` 跑在空 workspace 里，**不是** repo 里。要在 repo 里跑命令：
-
-```yaml
-- uses: x-cmd-action/this-repo@v1
-
-- run: make test
-  working-directory: ${{ github.workspace }}   # workspace 是空的 —— 错
-
-- run: make test
-  working-directory: ${{ env.REPO_DIR }}      # 用 env 设对
-  env:
-    REPO_DIR: ~/.x-repo/github.com/${{ github.repository }}
-```
-
-或者用知道这个布局的 x-cmd 工具（`x repo`、`x gitb backup`、`x eget` 等）—— 它们自己找 repo。
-
-如果想 cwd = repo 根，用 `x-cmd-action/checkout`（它 clone 到 `$GITHUB_WORKSPACE`）。这个 action 是给**就是想要 x-cmd 缓存布局**的人用的。
+需要以上任何一个，用 `x-cmd-action/checkout`。
 
 ## 用法
 
@@ -44,7 +27,17 @@ Layer 1（basic setup）action：一件事，最小化的那一件。
 - uses: x-cmd-action/this-repo@v1
 ```
 
-就这样。触发 repo 落到 `~/.x-repo/github.com/<owner>/<repo>`，local identity 是 `github-actions[bot]`。
+就这样。触发 repo 落到 `$GITHUB_WORKSPACE`，local identity 是 `github-actions[bot]`。后续 step：
+
+```yaml
+- uses: x-cmd-action/this-repo@v1
+
+- run: ls
+  # 看到 repo 内容 —— 不用 cd
+
+- run: make test
+  # cwd = repo 根
+```
 
 ### 拉子模块
 
@@ -56,7 +49,7 @@ Layer 1（basic setup）action：一件事，最小化的那一件。
 
 ### 浅克隆（确实需要时才用）
 
-`depth` 默认 `0`（全量历史）—— 这个 action 是把 repo 本地缓存给后续 x-cmd 工具用，全量是默认预期。只有确实需要时才显式覆盖成浅 fetch：
+`depth` 默认 `0`（全量）。只有确实需要时才显式覆盖：
 
 ```yaml
 - uses: x-cmd-action/this-repo@v1
@@ -102,7 +95,7 @@ Layer 1（basic setup）action：一件事，最小化的那一件。
 | Input | 默认 | 说明 |
 | --- | --- | --- |
 | `ref` | `${{ github.ref_name }}` | branch / tag / SHA |
-| `depth` | `0` | 取多少历史；`0` = 全量（默认 —— this-repo 是为本地缓存用，全量是默认预期）|
+| `depth` | `0` | 取多少历史；`0` = 全量 |
 | `lfs` | `false` | checkout 后跑 `git lfs pull` |
 | `submodules` | `false` | `false` / `true` / `recursive` |
 | `github-server-url` | `${{ github.server_url }}` | Enterprise 覆盖 |
@@ -110,13 +103,30 @@ Layer 1（basic setup）action：一件事，最小化的那一件。
 
 就这些。需要别的（SSH、自定义路径、sparse-checkout、filter ……），用 `x-cmd-action/checkout`。
 
+## 跟 `x-cmd-action/checkout` 的对比
+
+| 维度 | `this-repo` | `checkout` |
+| --- | --- | --- |
+| Inputs | 6 | 22 + 3 x-cmd 增强 |
+| Token / HTTPS clone | ✅ | ✅ |
+| SSH 认证 | ❌ | ✅ |
+| `repository:` / `path:` | 触发 repo，路径固定 | 可配 |
+| Sparse / filter | ❌ | ✅ |
+| `fetch-additional` | ❌ | ✅ |
+| `known-hosts-url` | ❌ | ✅ |
+| `persist-credentials` | 写死 | 可配 |
+| 默认 bot identity | ✅ | ✅ |
+| `gitconfig`（repo-scoped）| ✅ | ✅ |
+| cwd = repo 根 | ✅ | ✅ |
+
+**不需要 checkout 专属 input 时用 `this-repo`**。需要时用 `checkout`。
+
 ## 许可证
 
 Apache 2.0 —— 见 [`LICENSE`](LICENSE)。
 
 ## 相关链接
 
-- [`x-cmd-action/checkout`](https://github.com/x-cmd-action/checkout) —— 完整的 `actions/checkout` 替代品（Layer 2 / common functions）。有 SSH、sparse、filter 等。
+- [`x-cmd-action/checkout`](https://github.com/x-cmd-action/checkout) —— 完整 checkout，有 SSH、sparse、filter 等。`this-repo` 不够用时用这个。
 - [`x-cmd-action/gitconfig`](https://github.com/x-cmd-action/gitconfig) —— 全局 `~/.gitconfig` 设置。需要 config 作用于整个 job 所有命令时用它。
 - [x-cmd-action/.github](https://github.com/x-cmd-action/.github) —— org 主页 + 路线图。
-- [x-cmd `repo`](https://x-cmd.com/#repo) —— 本 action 落入的本地缓存布局（`~/.x-repo/...`）。
