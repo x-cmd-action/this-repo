@@ -44,11 +44,6 @@ jobs:
         with:
           submodules: true
 
-      - name: clone with local-config (repo-scoped .gitconfig)
-        uses: x-cmd-action/this-repo@v1
-        with:
-          local-config: ${{ github.workspace }}/test.repo.gitconfig
-
       - name: write a test local-config file
         run: |
           {
@@ -58,6 +53,11 @@ jobs:
           } > test.repo.gitconfig
           echo "=== test.repo.gitconfig ==="
           cat test.repo.gitconfig
+
+      - name: clone with local-config (repo-scoped .gitconfig)
+        uses: x-cmd-action/this-repo@v1
+        with:
+          local-config: ${{ github.workspace }}/test.repo.gitconfig
 
       - name: verify local-config overlay applied (repo-scoped)
         run: |
