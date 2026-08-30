@@ -54,6 +54,24 @@ fi
 
 git checkout -f FETCH_HEAD 2>/dev/null || git checkout "$REF"
 
+# ───────────────────── expose repo at $GITHUB_WORKSPACE ─────────────────────
+# Real repo lives at ~/.x-repo/<host>/<owner>/<repo> (x-cmd local cache). To
+# make subsequent steps run in the repo by default (like actions/checkout),
+# surface it at $GITHUB_WORKSPACE:
+#   - if the workspace is an empty directory, replace it with a symlink to
+#     the repo. cwd becomes the repo root.
+#   - if the workspace already has files, leave it alone and create a
+#     `.this-repo` symlink inside it (use
+#     `working-directory: ${{ github.workspace }}/.this-repo`).
+if [ -d "$GITHUB_WORKSPACE" ] && [ -z "$(ls -A "$GITHUB_WORKSPACE" 2>/dev/null)" ]; then
+    rmdir "$GITHUB_WORKSPACE"
+    ln -s "$TARGET_DIR" "$GITHUB_WORKSPACE"
+    echo "this-repo: \$GITHUB_WORKSPACE → $TARGET_DIR (cwd = repo root)"
+else
+    ln -s "$TARGET_DIR" "$GITHUB_WORKSPACE/.this-repo"
+    echo "this-repo: \$GITHUB_WORKSPACE/.this-repo → $TARGET_DIR"
+fi
+
 # ───────────────────── submodules ─────────────────────
 case "$SUBMODULES" in
     true|recursive)

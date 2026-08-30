@@ -5,7 +5,18 @@ description: |
   default bot identity, and (optionally) applies a repo-scoped
   .gitconfig via [include].
 
-  This is the x-cmd local cache layout (matches ~/.x-repo/<provider>/<owner>/<repo>).
+  The repo lives at ~/.x-repo/<host>/<owner>/<repo> — the x-cmd local
+  cache layout (matches ~/.x-repo/<provider>/<owner>/<repo>). So x-cmd
+  tools like `x repo` and `x gitb backup` find the repo automatically.
+
+  After cloning, this action exposes the repo at $GITHUB_WORKSPACE:
+  if the workspace is empty, it is REPLACED with a symlink to the
+  repo so subsequent `run:` steps run in the repo root by default
+  (same ergonomics as actions/checkout). If the workspace already has
+  files, a `.this-repo` symlink is created inside it instead — use
+  `working-directory: ${{ github.workspace }}/.this-repo` to run
+  commands in the repo.
+
   No SSH, no fetch-additional, no filter/sparse — just the minimum
   needed to land the current repo on disk for downstream steps.
 

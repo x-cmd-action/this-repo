@@ -20,6 +20,18 @@ jobs:
           echo "OK: $REPO_DIR exists and is a git repo"
           test -f "$REPO_DIR/action.yml" && echo "OK: action.yml present in cloned repo"
 
+      - name: verify \$GITHUB_WORKSPACE is a symlink to the repo
+        run: |
+          # The first this-repo step runs against an empty workspace, so the
+          # action replaces $GITHUB_WORKSPACE with a symlink → ~/.x-repo/.../repo
+          test -L "$GITHUB_WORKSPACE" || { echo "FAIL: \$GITHUB_WORKSPACE is not a symlink"; exit 1; }
+          TARGET=$(readlink "$GITHUB_WORKSPACE")
+          echo "symlink target: $TARGET"
+          EXPECTED="$HOME/.x-repo/github.com/${{ github.repository }}"
+          test "$TARGET" = "$EXPECTED" && echo "OK: \$GITHUB_WORKSPACE → $EXPECTED"
+          # Verify cwd (which defaults to $GITHUB_WORKSPACE) sees the repo
+          test -f "$GITHUB_WORKSPACE/action.yml" && echo "OK: action.yml visible via cwd (no cd needed)"
+
       - name: verify default bot identity applied
         run: |
           REPO_DIR="$HOME/.x-repo/github.com/${{ github.repository }}"
