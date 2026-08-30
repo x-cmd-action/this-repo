@@ -27,7 +27,7 @@ jobs:
           test "$(git config user.name)" = "github-actions[bot]" && echo "OK: default bot user.name"
           test "$(git config user.email)" = "github-actions[bot]@users.noreply.github.com" && echo "OK: default bot user.email"
 
-      - name: clone with depth: 0 (full history)
+      - name: "clone with depth: 0 (full history)"
         uses: x-cmd-action/this-repo@v1
         with:
           depth: 0
@@ -39,7 +39,7 @@ jobs:
           # Full-history fetch means FETCH_HEAD (or the default branch) has actual history
           git log --oneline | head -5
 
-      - name: clone with submodules: true
+      - name: "clone with submodules: true"
         uses: x-cmd-action/this-repo@v1
         with:
           submodules: true
@@ -51,11 +51,13 @@ jobs:
 
       - name: write a test local-config file
         run: |
-          cat > test.repo.gitconfig <<'EOF'
-[user]
-    name = thisrepo-specific-bot
-    email = thisrepo-specific@example.com
-EOF
+          {
+            echo "[user]"
+            echo "    name = thisrepo-specific-bot"
+            echo "    email = thisrepo-specific@example.com"
+          } > test.repo.gitconfig
+          echo "=== test.repo.gitconfig ==="
+          cat test.repo.gitconfig
 
       - name: verify local-config overlay applied (repo-scoped)
         run: |
