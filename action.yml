@@ -15,9 +15,9 @@ inputs:
     required: false
     default: ${{ github.ref_name }}
   depth:
-    description: 'Commits to fetch; 0 = full history'
+    description: 'Commits to fetch; 0 = full history. Default 0 — this-repo is for landing the current repo locally for downstream x-cmd tools; full history is the expected use case.'
     required: false
-    default: '1'
+    default: '0'
   lfs:
     description: 'Pull LFS files after checkout'
     required: false
@@ -30,7 +30,7 @@ inputs:
     description: 'GitHub server URL (override for Enterprise Server)'
     required: false
     default: ${{ github.server_url }}
-  local-config:
+  gitconfig:
     description: |
       Path to a .gitconfig file. When set, added as [include] in the
       cloned repo's .git/config — repo-scoped only, the runner's
@@ -49,7 +49,7 @@ runs:
         INPUT_LFS: ${{ inputs.lfs }}
         INPUT_SUBMODULES: ${{ inputs.submodules }}
         INPUT_GITHUB_SERVER_URL: ${{ inputs.github-server-url }}
-        INPUT_LOCAL_CONFIG: ${{ inputs.local-config }}
+        INPUT_GITCONFIG: ${{ inputs.gitconfig }}
         GITHUB_REPOSITORY: ${{ github.repository }}
         GITHUB_TOKEN: ${{ github.token }}
       run: bash ${{ github.action_path }}/lib/this-repo.sh

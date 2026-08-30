@@ -32,12 +32,14 @@ That's it. The trigger repo lands at `~/.x-repo/github.com/<owner>/<repo>` with 
     submodules: recursive
 ```
 
-### With full history
+### Shallow fetch (only when you need it)
+
+By default `depth` is `0` (full history) — this action is for landing the repo locally so downstream x-cmd tools can see it, so full history is the expected use case. Override to a shallow fetch only if you know that's what you want:
 
 ```yaml
 - uses: x-cmd-action/this-repo@v1
   with:
-    depth: 0
+    depth: 1
 ```
 
 ### With LFS
@@ -48,14 +50,14 @@ That's it. The trigger repo lands at `~/.x-repo/github.com/<owner>/<repo>` with 
     lfs: true
 ```
 
-### With a repo-scoped .gitconfig overlay (`local-config`)
+### With a repo-scoped .gitconfig overlay (`gitconfig`)
 
 For repo-specific signing keys, custom identity, hooks, etc. — values in this file override `~/.gitconfig` for this checkout only:
 
 ```yaml
 - uses: x-cmd-action/this-repo@v1
   with:
-    local-config: .github/repo.gitconfig
+    gitconfig: .github/repo.gitconfig
 ```
 
 `.github/repo.gitconfig`:
@@ -69,18 +71,20 @@ For repo-specific signing keys, custom identity, hooks, etc. — values in this 
     gpgsign = true
 ```
 
-> **Why no `name` / `email` input?** Identity is configured inside the `local-config` file's `[user]` section. Same effect, more flexible (you can also override signing keys, hooks, etc.).
+> **Why no `name` / `email` input?** Identity is configured inside the `gitconfig` file's `[user]` section. Same effect, more flexible (you can also override signing keys, hooks, etc.).
+>
+> **Naming convention:** the `gitconfig` input means "path to a .gitconfig file, applied as `[include]` at the appropriate scope". On this action it's repo-scoped (writes the repo's `.git/config`); on [`x-cmd-action/gitconfig`](https://github.com/x-cmd-action/gitconfig) the same input name is job-global (writes `~/.gitconfig`).
 
 ## Inputs
 
 | Input | Default | Description |
 | --- | --- | --- |
 | `ref` | `${{ github.ref_name }}` | branch / tag / SHA |
-| `depth` | `1` | commits to fetch; `0` = full history |
+| `depth` | `0` | commits to fetch; `0` = full history (default — this-repo is for local caching, full history is the expected case) |
 | `lfs` | `false` | pull LFS files after checkout |
 | `submodules` | `false` | `false` / `true` / `recursive` |
 | `github-server-url` | `${{ github.server_url }}` | override for Enterprise |
-| `local-config` | — | path to a `.gitconfig`; added as `[include]` in the repo's `.git/config` (repo-scoped only) |
+| `gitconfig` | — | path to a `.gitconfig`; added as `[include]` in the repo's `.git/config` (repo-scoped only) |
 
 That's the full list. If you need anything else (SSH, custom path, sparse-checkout, filter, …), use `x-cmd-action/checkout`.
 

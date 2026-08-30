@@ -32,12 +32,14 @@ Layer 1（basic setup）action：一件事，最小化的那一件。
     submodules: recursive
 ```
 
-### 全量历史
+### 浅克隆（确实需要时才用）
+
+`depth` 默认 `0`（全量历史）—— 这个 action 是把 repo 本地缓存给后续 x-cmd 工具用，全量是默认预期。只有确实需要时才显式覆盖成浅 fetch：
 
 ```yaml
 - uses: x-cmd-action/this-repo@v1
   with:
-    depth: 0
+    depth: 1
 ```
 
 ### 拉 LFS
@@ -48,14 +50,14 @@ Layer 1（basic setup）action：一件事，最小化的那一件。
     lfs: true
 ```
 
-### Repo-scoped .gitconfig overlay（`local-config`）
+### Repo-scoped .gitconfig overlay（`gitconfig`）
 
 给单个 checkout 配签名 key、自定义 identity、hooks 等 —— 文件里的值在该 repo 内覆盖 `~/.gitconfig`：
 
 ```yaml
 - uses: x-cmd-action/this-repo@v1
   with:
-    local-config: .github/repo.gitconfig
+    gitconfig: .github/repo.gitconfig
 ```
 
 `.github/repo.gitconfig`：
@@ -69,18 +71,20 @@ Layer 1（basic setup）action：一件事，最小化的那一件。
     gpgsign = true
 ```
 
-> **为什么没有 `name` / `email` input？** Identity 配在 `local-config` 文件的 `[user]` 段里。效果一样，更灵活（还可以覆盖签名 key、hooks 等）。
+> **为什么没有 `name` / `email` input？** Identity 配在 `gitconfig` 文件的 `[user]` 段里。效果一样，更灵活（还可以覆盖签名 key、hooks 等）。
+>
+> **命名约定**：`gitconfig` input 含义固定为"指向一个 .gitconfig 文件，作为 `[include]` 写到对应作用域"。在本 action 上是 repo-scoped（写到 repo 的 `.git/config`）；在 [`x-cmd-action/gitconfig`](https://github.com/x-cmd-action/gitconfig) 上同名 input 是 job 全局（写到 `~/.gitconfig`）。
 
 ## Inputs
 
 | Input | 默认 | 说明 |
 | --- | --- | --- |
 | `ref` | `${{ github.ref_name }}` | branch / tag / SHA |
-| `depth` | `1` | 取多少历史；`0` = 全量 |
+| `depth` | `0` | 取多少历史；`0` = 全量（默认 —— this-repo 是为本地缓存用，全量是默认预期）|
 | `lfs` | `false` | checkout 后跑 `git lfs pull` |
 | `submodules` | `false` | `false` / `true` / `recursive` |
 | `github-server-url` | `${{ github.server_url }}` | Enterprise 覆盖 |
-| `local-config` | — | `.gitconfig` 文件路径；往 repo 的 `.git/config` 加 `[include]`（仅本 repo）|
+| `gitconfig` | — | `.gitconfig` 文件路径；往 repo 的 `.git/config` 加 `[include]`（仅本 repo）|
 
 就这些。需要别的（SSH、自定义路径、sparse-checkout、filter ……），用 `x-cmd-action/checkout`。
 

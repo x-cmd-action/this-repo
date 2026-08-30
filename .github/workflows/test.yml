@@ -27,24 +27,33 @@ jobs:
           test "$(git config user.name)" = "github-actions[bot]" && echo "OK: default bot user.name"
           test "$(git config user.email)" = "github-actions[bot]@users.noreply.github.com" && echo "OK: default bot user.email"
 
-      - name: "clone with depth: 0 (full history)"
+      - name: "verify default depth: 0 (full history) lands"
+        run: |
+          # depth defaults to 0, so the default clone should already have full history.
+          # This step just confirms it.
+          REPO_DIR="$HOME/.x-repo/github.com/${{ github.repository }}"
+          cd "$REPO_DIR"
+          # If the repo has any history, default-depth-0 should give it to us.
+          git log --oneline | head -5
+
+      - name: "clone with depth: 1 (shallow)"
         uses: x-cmd-action/this-repo@v1
         with:
-          depth: 0
+          depth: 1
 
-      - name: verify full-history fetch
+      - name: verify shallow fetch took effect
         run: |
           REPO_DIR="$HOME/.x-repo/github.com/${{ github.repository }}"
           cd "$REPO_DIR"
-          # Full-history fetch means FETCH_HEAD (or the default branch) has actual history
-          git log --oneline | head -5
+          # .git/shallow exists after a shallow fetch
+          test -f .git/shallow && echo "OK: shallow fetch created .git/shallow"
 
       - name: "clone with submodules: true"
         uses: x-cmd-action/this-repo@v1
         with:
           submodules: true
 
-      - name: write a test local-config file
+      - name: write a test gitconfig file
         run: |
           {
             echo "[user]"
@@ -54,18 +63,18 @@ jobs:
           echo "=== test.repo.gitconfig ==="
           cat test.repo.gitconfig
 
-      - name: clone with local-config (repo-scoped .gitconfig)
+      - name: clone with gitconfig (repo-scoped .gitconfig)
         uses: x-cmd-action/this-repo@v1
         with:
-          local-config: ${{ github.workspace }}/test.repo.gitconfig
+          gitconfig: ${{ github.workspace }}/test.repo.gitconfig
 
-      - name: verify local-config overlay applied (repo-scoped)
+      - name: verify gitconfig overlay applied (repo-scoped)
         run: |
           REPO_DIR="$HOME/.x-repo/github.com/${{ github.repository }}"
           cd "$REPO_DIR"
           grep -q "include" .git/config && echo "OK: [include] directive in .git/config"
-          test "$(git config user.name)" = "thisrepo-specific-bot" && echo "OK: local-config user.name wins"
-          test "$(git config user.email)" = "thisrepo-specific@example.com" && echo "OK: local-config user.email wins"
+          test "$(git config user.name)" = "thisrepo-specific-bot" && echo "OK: gitconfig user.name wins"
+          test "$(git config user.email)" = "thisrepo-specific@example.com" && echo "OK: gitconfig user.email wins"
           # Global ~/.gitconfig must NOT have been touched by this action
           cd "$HOME" 2>/dev/null || cd /
           GLOBAL_NAME=$(git config --global user.name 2>/dev/null || echo)

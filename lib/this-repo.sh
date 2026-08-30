@@ -13,11 +13,11 @@ set -eu
 REPOSITORY="${GITHUB_REPOSITORY:-}"
 REF="${INPUT_REF:-}"
 TOKEN="${GITHUB_TOKEN:-}"
-DEPTH="${INPUT_DEPTH:-1}"
+DEPTH="${INPUT_DEPTH:-0}"
 LFS="${INPUT_LFS:-false}"
 SUBMODULES="${INPUT_SUBMODULES:-false}"
 GITHUB_SERVER_URL="${INPUT_GITHUB_SERVER_URL:-https://github.com}"
-LOCAL_CONFIG="${INPUT_LOCAL_CONFIG:-}"
+GITCONFIG="${INPUT_GITCONFIG:-}"
 
 HOST=$(echo "$GITHUB_SERVER_URL" | sed -E 's|^https?://||; s|/.*$||')
 [ -z "$REF" ] && REF="HEAD"
@@ -82,15 +82,15 @@ git remote set-url origin "${GITHUB_SERVER_URL}/${REPOSITORY}.git"
 git config user.name "github-actions[bot]"
 git config user.email "github-actions[bot]@users.noreply.github.com"
 
-# ───────────────────── local-config (optional) ─────────────────────
-if [ -n "$LOCAL_CONFIG" ]; then
-    if [ ! -f "$LOCAL_CONFIG" ]; then
-        echo "ERROR: local-config file not found: $LOCAL_CONFIG" >&2
+# ───────────────────── gitconfig (optional, repo-scoped) ─────────────────────
+if [ -n "$GITCONFIG" ]; then
+    if [ ! -f "$GITCONFIG" ]; then
+        echo "ERROR: gitconfig file not found: $GITCONFIG" >&2
         exit 1
     fi
-    INCLUDE_PATH=$(realpath "$LOCAL_CONFIG")
+    INCLUDE_PATH=$(realpath "$GITCONFIG")
     git config --local include.path "$INCLUDE_PATH"
-    echo "this-repo: local-config include.path=$INCLUDE_PATH (repo-scoped)"
+    echo "this-repo: gitconfig include.path=$INCLUDE_PATH (repo-scoped)"
 fi
 
 echo "this-repo: cloned to $TARGET_DIR"
