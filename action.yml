@@ -52,5 +52,4 @@ runs:
         INPUT_LOCAL_CONFIG: ${{ inputs.local-config }}
         GITHUB_REPOSITORY: ${{ github.repository }}
         GITHUB_TOKEN: ${{ github.token }}
-        HOME: ${{ github.workspace }}/..  # unused — keep for clarity
       run: bash ${{ github.action_path }}/lib/this-repo.sh
