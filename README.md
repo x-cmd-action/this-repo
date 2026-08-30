@@ -16,6 +16,28 @@ x-cmd caches repos locally at `~/.x-repo/<provider>/<owner>/<repo>` (see [`x rep
 
 Layer 1 (basic setup) action: one thing, the smallest possible thing.
 
+## Where the repo lands
+
+**Unlike `x-cmd-action/checkout`, this action does NOT clone into `$GITHUB_WORKSPACE`.** The repo is cloned to `~/.x-repo/github.com/<owner>/<repo>` (the x-cmd local cache). `$GITHUB_WORKSPACE` stays empty.
+
+Consequence: a bare `run:` after this action runs in an empty workspace, **not** in the repo. To run commands against the repo, either:
+
+```yaml
+- uses: x-cmd-action/this-repo@v1
+
+- run: make test
+  working-directory: ${{ github.workspace }}   # workspace is empty — wrong
+
+- run: make test
+  working-directory: ${{ env.REPO_DIR }}      # set via env below
+  env:
+    REPO_DIR: ~/.x-repo/github.com/${{ github.repository }}
+```
+
+Or use x-cmd tools that know the layout (`x repo`, `x gitb backup`, `x eget`, etc.) — they find the repo on their own.
+
+If you want cwd = repo root in subsequent steps, use `x-cmd-action/checkout` (it clones into `$GITHUB_WORKSPACE`). This action is for when you specifically want the x-cmd cache layout.
+
 ## Usage
 
 ```yaml

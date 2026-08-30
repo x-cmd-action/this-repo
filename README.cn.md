@@ -16,6 +16,28 @@ x-cmd 把 repo 本地缓存在 `~/.x-repo/<provider>/<owner>/<repo>`（见 [`x r
 
 Layer 1（basic setup）action：一件事，最小化的那一件。
 
+## Repo 落在哪
+
+**跟 `x-cmd-action/checkout` 不一样，这个 action 不 clone 到 `$GITHUB_WORKSPACE`。** Repo 落到 `~/.x-repo/github.com/<owner>/<repo>`（x-cmd 本地缓存）。`$GITHUB_WORKSPACE` 保持空。
+
+后果：this-action 之后裸 `run:` 跑在空 workspace 里，**不是** repo 里。要在 repo 里跑命令：
+
+```yaml
+- uses: x-cmd-action/this-repo@v1
+
+- run: make test
+  working-directory: ${{ github.workspace }}   # workspace 是空的 —— 错
+
+- run: make test
+  working-directory: ${{ env.REPO_DIR }}      # 用 env 设对
+  env:
+    REPO_DIR: ~/.x-repo/github.com/${{ github.repository }}
+```
+
+或者用知道这个布局的 x-cmd 工具（`x repo`、`x gitb backup`、`x eget` 等）—— 它们自己找 repo。
+
+如果想 cwd = repo 根，用 `x-cmd-action/checkout`（它 clone 到 `$GITHUB_WORKSPACE`）。这个 action 是给**就是想要 x-cmd 缓存布局**的人用的。
+
 ## 用法
 
 ```yaml
