@@ -1,21 +1,14 @@
 name: this-repo
 description: |
-  Minimal pure-shell checkout: clones the current GitHub repo to
-  ~/.x-repo/<host>/<owner>/<repo> using the runner's token, sets the
-  default bot identity, and (optionally) applies a repo-scoped
-  .gitconfig via [include].
+  Minimal pure-shell checkout: clones the current GitHub repo to the
+  x-cmd local cache (~/.x-repo/host/owner/repo) using the runner's
+  token, sets the default bot identity, and (optionally) applies a
+  repo-scoped .gitconfig via [include].
 
-  The repo lives at ~/.x-repo/<host>/<owner>/<repo> — the x-cmd local
-  cache layout (matches ~/.x-repo/<provider>/<owner>/<repo>). So x-cmd
-  tools like `x repo` and `x gitb backup` find the repo automatically.
-
-  After cloning, this action exposes the repo at $GITHUB_WORKSPACE:
-  if the workspace is empty, it is REPLACED with a symlink to the
-  repo so subsequent `run:` steps run in the repo root by default
-  (same ergonomics as actions/checkout). If the workspace already has
-  files, a `.this-repo` symlink is created inside it instead — use
-  `working-directory: ${{ github.workspace }}/.this-repo` to run
-  commands in the repo.
+  After cloning, this action replaces an empty GITHUB_WORKSPACE with
+  a symlink to the repo, so subsequent run: steps run in the repo by
+  default (same ergonomics as actions/checkout). If GITHUB_WORKSPACE
+  already has files, a '.this-repo' sublink is created instead.
 
   No SSH, no fetch-additional, no filter/sparse — just the minimum
   needed to land the current repo on disk for downstream steps.
