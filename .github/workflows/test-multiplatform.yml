@@ -40,11 +40,14 @@ jobs:
           URL=$(git -C "$GITHUB_WORKSPACE" config remote.origin.url)
           echo "$URL" | grep -qv "x-access-token" || { echo "FAIL: token in URL"; exit 1; }
 
-          # ── metrics ──
-          COLD_NS=$(awk 'BEGIN {getline s < "/tmp/bench_start"; getline e < "/tmp/bench_end"; printf "%.0f", (e-s)/1000000}')
-          CLONE_BYTES=$(du -sb "$GITHUB_WORKSPACE" | awk '{print $1}')
-          TARBALL_BYTES=$(du -sb "$HOME/.cache/actions/x-cmd-action/this-repo" 2>/dev/null \
-                            || find /home/runner/work/_actions/x-cmd-action/this-repo -type f -exec wc -c {} + 2>/dev/null | tail -1 | awk '{print $1}')
+          # ── metrics (POSIX-portable; no GNU-awk, no `du -sb` on macOS) ──
+          S=$(cat /tmp/bench_start)
+          E=$(cat /tmp/bench_end)
+          COLD_MS=$(( (E - S) / 1000000 ))
+          # Use `find -printf` on GNU; on macOS use `find -exec stat -f%z` (BSD).
+          # Cross-platform: `find -exec wc -c` works everywhere.
+          CLONE_BYTES=$(find "$GITHUB_WORKSPACE" -type f -exec wc -c {} + 2>/dev/null | tail -1 | awk '{print $1}')
+          CLONE_BYTES=${CLONE_BYTES:-0}
           BASH_VERSION_STR=$(bash --version | head -1)
 
           {
@@ -53,12 +56,12 @@ jobs:
             echo "| metric | value |"
             echo "|---|---|"
             echo "| result | PASS |"
-            echo "| step wall-clock (cold) | ${COLD_NS} ms |"
+            echo "| step wall-clock (cold) | ${COLD_MS} ms |"
             echo "| cloned repo size | ${CLONE_BYTES} bytes |"
             echo "| bash version | ${BASH_VERSION_STR} |"
           } >> "$GITHUB_STEP_SUMMARY"
 
-          echo "RESULT=PASS BASH=$BASH_VERSION_STR STEP_MS=$COLD_NS CLONE_BYTES=$CLONE_BYTES TARBALL_BYTES=$TARBALL_BYTES" >> "$GITHUB_OUTPUT"
+          echo "RESULT=PASS BASH=$BASH_VERSION_STR STEP_MS=$COLD_MS CLONE_BYTES=$CLONE_BYTES" >> "$GITHUB_OUTPUT"
 
   test-windows:
     name: "windows-latest"
@@ -103,8 +106,11 @@ jobs:
           URL=$(git config remote.origin.url)
           echo "$URL" | grep -qv "x-access-token" || { echo "FAIL: token in URL"; exit 1; }
 
-          COLD_NS=$(awk 'BEGIN {getline s < "/tmp/bench_start"; getline e < "/tmp/bench_end"; printf "%.0f", (e-s)/1000000}')
-          CLONE_BYTES=$(du -sb "$GITHUB_WORKSPACE" | awk '{print $1}')
+          S=$(cat /tmp/bench_start)
+          E=$(cat /tmp/bench_end)
+          COLD_MS=$(( (E - S) / 1000000 ))
+          CLONE_BYTES=$(find "$GITHUB_WORKSPACE" -type f -exec wc -c {} + 2>/dev/null | tail -1 | awk '{print $1}')
+          CLONE_BYTES=${CLONE_BYTES:-0}
           BASH_VERSION_STR=$(bash --version 2>&1 | head -1 || echo "bash unavailable")
 
           {
@@ -113,12 +119,12 @@ jobs:
             echo "| metric | value |"
             echo "|---|---|"
             echo "| result | PASS |"
-            echo "| step wall-clock (cold) | ${COLD_NS} ms |"
+            echo "| step wall-clock (cold) | ${COLD_MS} ms |"
             echo "| cloned repo size | ${CLONE_BYTES} bytes |"
             echo "| bash version | ${BASH_VERSION_STR} |"
           } >> "$GITHUB_STEP_SUMMARY"
 
-          echo "RESULT=PASS BASH=$BASH_VERSION_STR STEP_MS=$COLD_NS CLONE_BYTES=$CLONE_BYTES" >> "$GITHUB_OUTPUT"
+          echo "RESULT=PASS BASH=$BASH_VERSION_STR STEP_MS=$COLD_MS CLONE_BYTES=$CLONE_BYTES" >> "$GITHUB_OUTPUT"
 
   test-macos:
     name: "macos-latest"
@@ -156,8 +162,11 @@ jobs:
           URL=$(git -C "$GITHUB_WORKSPACE" config remote.origin.url)
           echo "$URL" | grep -qv "x-access-token" || { echo "FAIL: token in URL"; exit 1; }
 
-          COLD_NS=$(awk 'BEGIN {getline s < "/tmp/bench_start"; getline e < "/tmp/bench_end"; printf "%.0f", (e-s)/1000000}')
-          CLONE_BYTES=$(du -sb "$GITHUB_WORKSPACE" | awk '{print $1}')
+          S=$(cat /tmp/bench_start)
+          E=$(cat /tmp/bench_end)
+          COLD_MS=$(( (E - S) / 1000000 ))
+          CLONE_BYTES=$(find "$GITHUB_WORKSPACE" -type f -exec wc -c {} + 2>/dev/null | tail -1 | awk '{print $1}')
+          CLONE_BYTES=${CLONE_BYTES:-0}
           BASH_VERSION_STR=$(bash --version | head -1)
 
           {
@@ -166,12 +175,12 @@ jobs:
             echo "| metric | value |"
             echo "|---|---|"
             echo "| result | PASS |"
-            echo "| step wall-clock (cold) | ${COLD_NS} ms |"
+            echo "| step wall-clock (cold) | ${COLD_MS} ms |"
             echo "| cloned repo size | ${CLONE_BYTES} bytes |"
             echo "| bash version | ${BASH_VERSION_STR} |"
           } >> "$GITHUB_STEP_SUMMARY"
 
-          echo "RESULT=PASS BASH=$BASH_VERSION_STR STEP_MS=$COLD_NS CLONE_BYTES=$CLONE_BYTES" >> "$GITHUB_OUTPUT"
+          echo "RESULT=PASS BASH=$BASH_VERSION_STR STEP_MS=$COLD_MS CLONE_BYTES=$CLONE_BYTES" >> "$GITHUB_OUTPUT"
 
   # ─── Aggregate + auto-issue ───
   report:
@@ -220,7 +229,7 @@ jobs:
 
       - name: open / comment issue on failure
         if: steps.decide.outputs.all_pass == 'false'
-        uses: peter-evans/create-or-update-issue@v4
+        uses: peter-evans/create-issue@v4
         with:
           title: "Multi-platform test failed"
           body: |
